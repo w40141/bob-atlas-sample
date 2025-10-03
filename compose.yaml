@@ -1,0 +1,66 @@
+services:
+  db:
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    image: mysql:latest
+    ports:
+      - ${DB_EXPOSE_PORT}:3306
+    volumes:
+      - type: bind
+        source: ./docker/db/conf.d/my.cnf
+        target: /etc/mysql/conf.d/my.cnf
+      - type: bind
+        source: ./docker/db/data
+        target: /docker-entrypoint-initdb.d
+      - type: volume
+        source: database
+        target: /var/lib/mysql
+  phpmyadmin:
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+      PMA_USER: ${DB_USER}
+      PMA_PASSWORD: ${DB_PASSWORD}
+    image: phpmyadmin:latest
+    ports:
+      - ${PMA_EXPOSE_PORT}:80
+  # migration:
+  #   build:
+  #     context: .
+  #     dockerfile: ./docker/migration/Dockerfile
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
+  #   environment:
+  #     DB_NAME: ${DB_NAME}
+  #     DB_USER: ${DB_USER}
+  #     DB_PASSWORD: ${DB_PASSWORD}
+  #     DB_HOST: db
+  #     DB_PORT: 3306
+  # generate:
+  #   build:
+  #     context: .
+  #     dockerfile: ./docker/generate/Dockerfile
+  #   depends_on:
+  #     migration:
+  #       condition: service_completed_successfully
+  #   environment:
+  #     MYSQL_DSN: "${DB_USER}:${DB_PASSWORD}@tcp(db:3306)/${DB_NAME}"
+  #   user: "${HOST_UID}:${HOST_GID}"
+  #   volumes:
+  #     - type: bind
+  #       source: ./pkg/gen
+  #       target: /app/pkg/gen
+volumes:
+  database:
